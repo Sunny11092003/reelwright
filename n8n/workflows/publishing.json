@@ -1,0 +1,259 @@
+{
+  "name": "ACA - Publishing",
+  "nodes": [
+    {
+      "id": "1f321e8d-ecc5-4868-8683-19fd3cc5709a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "0799b4e3-4812-4aba-a862-a417f69dd65f",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aca/publishing",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "0ab36e88-b537-4f06-a78f-2f42c199fac3",
+      "name": "Valid secret?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "047e59e8-85b5-465b-a9f7-af023ed37454",
+              "leftValue": "={{ $json.headers['x-aca-secret'] }}",
+              "rightValue": "={{ $env.ACA_WEBHOOK_SECRET }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "12e60ced-b2fb-4d51-9975-8872e4d686f9",
+      "name": "Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        360
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"error\":\"invalid secret\"} }}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    },
+    {
+      "id": "af3dd3b4-5da7-4ae9-a3e2-861863384039",
+      "name": "Accept",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        120
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"accepted\":true} }}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "e2561996-445c-445c-b3fe-28acb1b77012",
+      "name": "Run stage on backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        120
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ACA_BACKEND_URL }}/api/internal/stages/publishing/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-internal-secret",
+              "value": "={{ $env.ACA_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ userId: $('Webhook').item.json.body.userId, resourceId: $('Webhook').item.json.body.resourceId, requestId: $('Webhook').item.json.body.requestId }) }}",
+        "options": {
+          "timeout": 900000
+        }
+      }
+    },
+    {
+      "id": "1a8db433-ed01-4e12-918c-b4da7f48a3ec",
+      "name": "Report completed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        40
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ACA_BACKEND_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-aca-secret",
+              "value": "={{ $env.ACA_WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event: 'stage.completed', stage: 'publishing', userId: $('Webhook').item.json.body.userId, resourceId: $('Webhook').item.json.body.resourceId, requestId: $('Webhook').item.json.body.requestId || 'n8n' }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "dac23b49-9624-4264-9c4a-43b99babc848",
+      "name": "Report failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        220
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ACA_BACKEND_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-aca-secret",
+              "value": "={{ $env.ACA_WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event: 'stage.failed', stage: 'publishing', userId: $('Webhook').item.json.body.userId, resourceId: $('Webhook').item.json.body.resourceId, requestId: $('Webhook').item.json.body.requestId || 'n8n', error: { code: 'N8N_STEP_FAILED', message: String($json.error && $json.error.message || $json.message || 'Workflow step failed').slice(0, 900) } }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Valid secret?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid secret?": {
+      "main": [
+        [
+          {
+            "node": "Accept",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept": {
+      "main": [
+        [
+          {
+            "node": "Run stage on backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run stage on backend": {
+      "main": [
+        [
+          {
+            "node": "Report completed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

@@ -1,0 +1,235 @@
+{
+  "name": "ACA - Analytics",
+  "nodes": [
+    {
+      "id": "40c92e10-7e68-4d22-848b-35cbb132c288",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        120
+      ],
+      "webhookId": "0c529218-6fd6-4534-a150-8ca5248c8ce5",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aca/analytics",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "dac39504-fdf2-48c0-908e-6e1bacce0d5a",
+      "name": "Valid secret?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f83243df-4c53-4756-9cb3-c9ae04bb9c67",
+              "leftValue": "={{ $json.headers['x-aca-secret'] }}",
+              "rightValue": "={{ $env.ACA_WEBHOOK_SECRET }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "51ea4784-8264-4960-9ba7-095f391b504e",
+      "name": "Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        280
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"error\":\"invalid secret\"} }}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    },
+    {
+      "id": "3178e70d-856b-4416-b6f8-399da76bad89",
+      "name": "Accept",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        40
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"accepted\":true} }}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "2be20171-4775-41fb-bfef-2b011ea7d3d8",
+      "name": "Sync user metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        40
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ACA_BACKEND_URL }}/api/internal/stages/analytics-sync/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-internal-secret",
+              "value": "={{ $env.ACA_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ userId: $('Webhook').item.json.body.userId, resourceId: $('Webhook').item.json.body.resourceId, requestId: $('Webhook').item.json.body.requestId }) }}",
+        "options": {
+          "timeout": 900000
+        }
+      }
+    },
+    {
+      "id": "cd404e1c-712f-480b-bda6-d29a641d0d2a",
+      "name": "Every 6 hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        460
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "20adcd1b-8cc7-4024-a12c-e10b163af94f",
+      "name": "Sync all users",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        460
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 30000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ACA_BACKEND_URL }}/api/internal/analytics/sync-all",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-internal-secret",
+              "value": "={{ $env.ACA_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 900000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Valid secret?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid secret?": {
+      "main": [
+        [
+          {
+            "node": "Accept",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept": {
+      "main": [
+        [
+          {
+            "node": "Sync user metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 6 hours": {
+      "main": [
+        [
+          {
+            "node": "Sync all users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

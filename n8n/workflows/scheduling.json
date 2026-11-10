@@ -1,0 +1,193 @@
+{
+  "name": "ACA - Scheduling",
+  "nodes": [
+    {
+      "id": "3313b848-c4e4-45b4-8b51-66a7af0ea573",
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "35ee632c-8043-4d80-8bb9-072ac786631c",
+      "name": "Claim due posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ACA_BACKEND_URL }}/api/internal/scheduler/claim",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-internal-secret",
+              "value": "={{ $env.ACA_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "05af8705-f1c5-49e0-9d15-8be5d477919d",
+      "name": "Split jobs",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "fieldToSplitOut": "jobs",
+        "options": {}
+      }
+    },
+    {
+      "id": "c84f4a6c-fd3e-495c-8dea-a1ec5b3e6cd1",
+      "name": "Publish scheduled job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ACA_BACKEND_URL }}/api/internal/stages/publishing/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-internal-secret",
+              "value": "={{ $env.ACA_INTERNAL_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ userId: $json.userId, resourceId: $json.jobId, requestId: 'scheduled-' + $json.jobId }) }}",
+        "options": {
+          "timeout": 900000
+        }
+      }
+    },
+    {
+      "id": "0b14031b-80a4-4bc7-b567-36159f9d3329",
+      "name": "Report failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        280
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ACA_BACKEND_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-aca-secret",
+              "value": "={{ $env.ACA_WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event: 'stage.failed', stage: 'publishing', userId: $('Split jobs').item.json.userId, resourceId: $('Split jobs').item.json.jobId, requestId: 'scheduled', error: { code: 'N8N_STEP_FAILED', message: String($json.error && $json.error.message || 'Workflow step failed').slice(0, 900) } }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every minute": {
+      "main": [
+        [
+          {
+            "node": "Claim due posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim due posts": {
+      "main": [
+        [
+          {
+            "node": "Split jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split jobs": {
+      "main": [
+        [
+          {
+            "node": "Publish scheduled job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish scheduled job": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Report failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

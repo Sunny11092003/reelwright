@@ -1,0 +1,15 @@
+{
+  "name": "ai-content-agent",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AI Content & Social Publishing Agent",
+  "scripts": {
+    "sync:shared": "node scripts/sync-shared.mjs",
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm run sync:shared && npm --prefix backend run build && npm --prefix frontend run build",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
+    "validate:n8n": "node scripts/validate-n8n.mjs"
+  }
+}

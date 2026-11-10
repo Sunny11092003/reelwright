@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; color: #18262A; background: #F2F4F1; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.01em; }
+  :focus-visible { outline: 2px solid #E9A63A; outline-offset: 2px; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-primary { @apply btn bg-harbor-800 text-white hover:bg-harbor-700; }
+  .btn-accent { @apply btn bg-marigold-500 text-harbor-950 hover:bg-marigold-600; }
+  .btn-secondary { @apply btn border border-ink-line bg-white text-ink hover:bg-harbor-50; }
+  .btn-ghost { @apply btn text-ink-soft hover:bg-harbor-50 hover:text-ink; }
+  .btn-danger { @apply btn bg-signal-red text-white hover:bg-red-800; }
+  .input { @apply w-full rounded-lg border border-ink-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-harbor-500 focus:outline-none focus:ring-2 focus:ring-harbor-500/20 disabled:bg-canvas; }
+  .label { @apply mb-1 block text-sm font-medium text-ink; }
+  .hint { @apply mt-1 text-xs text-ink-soft; }
+  .panel { @apply rounded-xl border border-ink-line bg-surface shadow-panel; }
+  .skeleton { @apply animate-pulse rounded-md bg-ink-line/70; }
+}
+
+.prose-editor h2 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.25rem; font-weight: 700; margin: 1.1em 0 .4em; }
+.prose-editor h3 { font-weight: 600; font-size: 1.05rem; margin: 1em 0 .3em; }
+.prose-editor p { margin: .6em 0; }
+.prose-editor ul { list-style: disc; padding-left: 1.4rem; margin: .6em 0; }
+.prose-editor ol { list-style: decimal; padding-left: 1.4rem; margin: .6em 0; }
+.prose-editor a { color: #1B4D4E; text-decoration: underline; }
